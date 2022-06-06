@@ -974,7 +974,7 @@ ModelInstanceState::ProcessRequests(
       responses.emplace_back(response);
     } else {
       responses.emplace_back(nullptr);
-      LOG_MESSAGE(TRITONSERVER_LOG_ERROR, (requests[i].IdString() + "Fail to create response").c_str());
+      LOG_MESSAGE(TRITONSERVER_LOG_ERROR, (requests[i]->IdString() + "Fail to create response").c_str());
       TRITONSERVER_ErrorDelete(err);
     }
   }
