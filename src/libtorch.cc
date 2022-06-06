@@ -974,7 +974,7 @@ ModelInstanceState::ProcessRequests(
       responses.emplace_back(response);
     } else {
       responses.emplace_back(nullptr);
-      LOG_MESSAGE(TRITONSERVER_LOG_ERROR, "Fail to create response");
+      LOG_MESSAGE(TRITONSERVER_LOG_ERROR, (requests[i].IdString() + "Fail to create response").c_str());
       TRITONSERVER_ErrorDelete(err);
     }
   }
@@ -1166,11 +1166,12 @@ ModelInstanceState::ProcessRequests(
             TritonModelInstance(), request,
             (responses[r] != nullptr) /* success */, exec_start_ns,
             compute_start_ns, compute_end_ns, exec_end_ns),
-        "failed reporting request statistics");
+        (request.IdString + 
+        "failed reporting request statistics").c_str());
 
     LOG_IF_ERROR(
         TRITONBACKEND_RequestRelease(request, TRITONSERVER_REQUEST_RELEASE_ALL),
-        "failed releasing request");
+        (request.IdString + "failed releasing request").c_str());
   }
 
   if (!all_response_failed) {
