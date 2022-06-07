@@ -1166,12 +1166,12 @@ ModelInstanceState::ProcessRequests(
             TritonModelInstance(), request,
             (responses[r] != nullptr) /* success */, exec_start_ns,
             compute_start_ns, compute_end_ns, exec_end_ns),
-        (request.IdString + 
+        (request->IdString + 
         "failed reporting request statistics").c_str());
 
     LOG_IF_ERROR(
         TRITONBACKEND_RequestRelease(request, TRITONSERVER_REQUEST_RELEASE_ALL),
-        (request.IdString + "failed releasing request").c_str());
+        (request->IdString + "failed releasing request").c_str());
   }
 
   if (!all_response_failed) {
