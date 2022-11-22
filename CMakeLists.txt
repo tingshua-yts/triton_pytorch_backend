@@ -125,6 +125,12 @@ if(${TRITON_ENABLE_NVTX})
   add_definitions(-DTRITON_ENABLE_NVTX=1)
 endif() # TRITON_ENABLE_NVTX
 
+# Gperftools
+#
+link_directories(/usr/local/lib)
+LIST(APPEND CMAKE_MODULE_PATH "${repo-common_SOURCE_DIR}/cmake")
+find_package(Gperftools REQUIRED)
+
 #
 # Shared library implementing the Triton Backend API
 #
@@ -267,6 +273,11 @@ target_include_directories(
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${Python3_INCLUDE_DIRS}
+)
+
+target_include_directories(
+  triton-pytorch-backend
+  PRIVATE ${GPERFTOOLS_INCLUDE_DIR}
 )
 
 if (${TRITON_PYTORCH_DOCKER_BUILD})
