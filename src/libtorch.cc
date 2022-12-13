@@ -992,10 +992,10 @@ ModelInstanceState::ProcessRequests(
        std::to_string(request_count) + " requests")
           .c_str());
 
+  // 构建stream
   if (Kind() == TRITONSERVER_INSTANCEGROUPKIND_GPU) {
 #ifdef TRITON_ENABLE_GPU
-    at::cuda::CUDAStream torch_stream =
-        at::cuda::getStreamFromExternal(stream_, DeviceId());
+    at::cuda::CUDAStream torch_stream = at::cuda::getStreamFromExternal(stream_, DeviceId());
     at::cuda::setCurrentCUDAStream(torch_stream);
 #endif
   }
@@ -1007,6 +1007,7 @@ ModelInstanceState::ProcessRequests(
 
   const int max_batch_size = model_state_->MaxBatchSize();
 
+  // 检查request
   // For each request collect the total batch size for this inference
   // execution. The batch-size, number of inputs, and size of each
   // input has already been checked so don't need to do that here.
@@ -1041,6 +1042,7 @@ ModelInstanceState::ProcessRequests(
   responses.reserve(request_count);
   bool all_response_failed = false;
 
+  // 构建response
   for (size_t i = 0; i < request_count; i++) {
     TRITONBACKEND_Response* response;
     auto err = TRITONBACKEND_ResponseNew(&response, requests[i]);
@@ -1053,6 +1055,7 @@ ModelInstanceState::ProcessRequests(
     }
   }
 
+  // 统计当前requests的batch size
   for (size_t i = 0; i < request_count; i++) {
     if (max_batch_size > 0) {
       // Retrieve the batch size from one of the inputs, if the model
@@ -1085,6 +1088,7 @@ ModelInstanceState::ProcessRequests(
   // (i.e. max_batch_size == 0). If max_batch_size is exceeded then
   // scheduler has done something badly wrong so fail and release all
   // requests.
+  // 确定batch size没有超过max_batch_size
   if (!all_response_failed) {
     if ((total_batch_size != 1) &&
         (total_batch_size > (size_t)max_batch_size)) {
@@ -1105,6 +1109,8 @@ ModelInstanceState::ProcessRequests(
   std::vector<BackendMemory*> input_memories;
   bool cuda_copy = false;
   std::unique_ptr<BackendInputCollector> collector;
+
+  // 构建cuda的input buffer
   if (Kind() == TRITONSERVER_INSTANCEGROUPKIND_GPU) {
 #ifdef TRITON_ENABLE_GPU
     RESPOND_ALL_AND_SET_TRUE_IF_ERROR(
@@ -1145,6 +1151,7 @@ ModelInstanceState::ProcessRequests(
           reinterpret_cast<void*>(&compute_infer_start_event_)));
 
   // Run...
+  // 进行inference
   if (!all_response_failed) {
     Execute(&responses, request_count, &input_tensors, &output_tensors);
   }
@@ -1188,6 +1195,7 @@ ModelInstanceState::ProcessRequests(
           &compute_end_ns,
           reinterpret_cast<void*>(&compute_output_start_event_)));
 
+  // 读取output tensor
   if (!all_response_failed) {
     if (!invalid_index) {
       RESPOND_ALL_AND_SET_TRUE_IF_ERROR(
@@ -1280,22 +1288,20 @@ ModelInstanceState::Execute(
   torch::jit::IValue model_outputs_;
 
   try {
+    // 配置inference参数
     // enable/disable optimized execution
-    torch::jit::setGraphExecutorOptimize(
-        model_state_->EnabledOptimizedExecution());
+    torch::jit::setGraphExecutorOptimize(model_state_->EnabledOptimizedExecution());
 
     // enable/disable inference mode - supersedes NoGradGuard
     torch::InferenceMode infer_guard(model_state_->EnabledInferenceMode());
 
     // JIT. No change is made unless parameter is explicitly set.
     if (std::get<0>(model_state_->EnabledJitProfiling())) {
-      torch::jit::getProfilingMode() =
-          std::get<1>(model_state_->EnabledJitProfiling());
+      torch::jit::getProfilingMode() = std::get<1>(model_state_->EnabledJitProfiling());
     }
 
     if (std::get<0>(model_state_->EnabledJitExecutor())) {
-      torch::jit::getExecutorMode() =
-          std::get<1>(model_state_->EnabledJitExecutor());
+      torch::jit::getExecutorMode() =  std::get<1>(model_state_->EnabledJitExecutor());
     }
 
     // Fuser. Parameter is ignored if NVFuser parameter is explicitily
@@ -1326,6 +1332,7 @@ ModelInstanceState::Execute(
     torch::NoGradGuard no_grad;
 
     // If input is a dictionary, prepare dictionary from 'input_tensors'.
+    // 执行inference
     if (is_dict_input_) {
       torch::Dict<std::string, torch::Tensor> input_dict;
       for (auto& input_index : input_index_map_) {
@@ -1338,6 +1345,8 @@ ModelInstanceState::Execute(
       model_outputs_ = torch_model_->forward(*input_tensors);
     }
 
+
+    // 设置结果
     if (model_outputs_.isTuple()) {
       auto model_outputs_tuple = model_outputs_.toTuple();
       size_t op_index = 0;
